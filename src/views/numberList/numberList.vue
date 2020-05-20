@@ -14,15 +14,25 @@
             >
             <div slot="action" style="color:#25C973;" @click="queryNumberList(true)">搜索</div>
         </van-search>
-    
-
         <van-dropdown-menu>
             <van-dropdown-item :title="search.locationText"  ref="addressRef">
                 <van-area :area-list="areaList" :columns-num="2" @confirm='confirmChoiceAddress' @cancel="cancelChoiceAddress"/>
             </van-dropdown-item>
-            <van-dropdown-item v-model="search.levelRegex" :options="searchOption[0]" @change='dropdownChange' />
-            <van-dropdown-item v-model="search.providerCode" :options="searchOption[1]" @change='dropdownChange' />
-            <van-dropdown-item v-model="search.money" :options="searchOption[2]" @change='dropdownChange' />
+            <van-dropdown-item 
+                v-model="search.levelRegex" 
+                :options="searchOption[0]"
+                @change='dropdownChange' />
+            <van-dropdown-item 
+                v-model="search.providerCode" 
+                :options="searchOption[1]"
+                @change='dropdownChange' />
+            <van-dropdown-item
+                class="index-orderOption"
+                ref="orderOption"
+                v-model="search.money"
+                :options="searchOption[2]"
+                @change='dropdownChange' >
+            </van-dropdown-item>
         </van-dropdown-menu>
         <van-list
             v-model="loading"
@@ -35,11 +45,11 @@
             <van-cell  v-for="(item,index) in numberList"
                 :key="item.index"
                 size='large'
-                :title="item.serialNumber"
-                :label="'月底保底消费'+ (item.baseAmount!=null && item.baseAmount != ''?item.baseAmount/100:0) + '元'"
-                :value="'预存 '+item.preDeposit/100+' 元'"
-                @click='goChoicePackage(index)'
-                is-link>
+                :title="item.phoneNumber"
+                :label="item.provinceName+','+item.cityName"
+                @click='goChoicePackage(index)'>
+                <div>含话费<span style="color:red">{{item.prostoreMoney}}</span> 元</div>
+                <div>{{item.mno}}</div>
             </van-cell>
         </van-list>
   </div>
@@ -64,22 +74,17 @@ export default {
             },
             searchOption:[
                 [
-                    { text: '全部等级', value: 'all' },
-                    // { text: '砖石', value: '砖石' },
-                    // { text: 'AAAA', value: 'AAAA' },
-                    // { text: 'ABCD', value: 'ABCD' }
+                    { text: '全部等级', value: 'all' }
                 ],
                 [
                     { text: '全部提供商', value: 'all' },
-                    { text: '联通', value: 'CUC' },
-                    { text: '电信', value: 'CTC' }
+                    { text: '联通', value: 3 },
+                    { text: '电信', value: 4 }
                 ],
                 [
                     { text: '筛选', value: 0 },
-                    { text: '按保底消费降序', value: 1 },
-                    { text: '按保底消费升序', value: 2 },
-                    { text: '按预存金额降序', value: 3 },
-                    { text: '按预存金额升序', value: 4 }
+                    { text: '内含话费降序', value: 1 },
+                    { text: '内含话费升序', value: 2 }
                 ]
             ],
             numberList: [],
@@ -116,13 +121,7 @@ export default {
             this.queryNumberList(true);
         },
         goChoicePackage(index){
-            //套餐包选择
-            var numberObj = this.numberList[index];
-            sessionStorage.setItem(setAesString("numberObj"),setAesString(JSON.stringify(numberObj)));
-            //TODO 
-            this.$router.push({
-                path:"/packageChoice"
-            });
+           
         },
         confirmChoiceAddress(obj){
             //确认地址选择，code 代表被选中的地区编码， name 代表被选中的地区名称
@@ -143,80 +142,73 @@ export default {
         queryNumberLevelRegex(){
             //查询号码等级
             var formdata={
-                service : "user.qryAcNumberLevelRegex",
+                
             }
-            this.$api.post("/mstx/pr/gateway.do", formdata,(res)=>{
+            this.$api.post("/dataDictionary/byPCode/RANK_LEVEL", formdata,(res)=>{
                 if(res != null && res.length > 0){
                     for(var i = 0; i < res.length; i++){
                         this.searchOption[0].push({
-                            text:res[i],
-                            value:res[i]
+                            text:res[i].name,
+                            value:res[i].v1
                         });
                     }
                 }
             },(res)=>{
                 this.$toast.fail(res.errorMsg);
- 
+
             });
         },
         queryNumberList(reset){
-
             if(reset){
                 this.numberList=[];
-                this.page.pageNum = 1;
             }
 
             var formdata={
                 ...this.page,
-                service : "user.qryChoiceNumber",
-            }
-
-            if(this.search.locationArr != null && this.search.locationArr[1] != null){
-                formdata.provinceCode = '8'+this.search.locationArr[0].code;
-                formdata.regionCode = '8'+this.search.locationArr[1].code;
+                param:{}
             }
 
             if(this.search.inputValue != ''){
-                formdata.serialNumber = this.search.inputValue;
+                formdata.param.phoneNumber = this.search.inputValue;
             }
 
             if(this.search.levelRegex != 'all'){
-                formdata.levelRegex = this.search.levelRegex;
+                formdata.param.rank = this.search.levelRegex;
             }
-            
             if(this.search.providerCode != 'all'){
-                formdata.providerCode = this.search.providerCode;
+                formdata.param.mno = this.search.providerCode;
             }
 
             if(this.search.money == 1){
-                formdata.orderByBaseAmount = '0';//保底
+                formdata.param.bossPrestoreDesc = true;
             }else if(this.search.money == 2){
-                formdata.orderByBaseAmount = '1';
-            }else if(this.search.money == 3){
-                formdata.orderByPreDeposit = '1';//预付
-            }else if(this.search.money == 4){
-                formdata.orderByPreDeposit = '0';
+                formdata.param.bossPrestoreAsc = true;
             }
 
-            this.$api.post("/mstx/pr/gateway.do", formdata,(res)=>{
+            if(this.search.locationArr != null && this.search.locationArr[1] != null){
+                formdata.param.provinceId= this.search.locationArr[0].code;
+                formdata.param.cityId = this.search.locationArr[1].code;
+            }
+
+            this.$api.post("/phoneInfo/list", formdata,(res)=>{
                 this.loadError = false;
                 // 加载状态结束
                 this.loading = false;
-                if(res != null && res.list.length>0){
-                for(var i = 0; i < res.list.length; i++){
-                    this.numberList.push(res.list[i]);
+                if(res != null && res.content.length>0){
+                for(var i = 0; i < res.content.length; i++){
+                    this.numberList.push(res.content[i]);
                 }
-                if(res.list.length < this.page.pageSize){
+                if(res.content.length < this.page.pageSize){
                     this.finished = true;
-                    this.page.pageNum = 1;
+                    this.page.currentPage = 1;
                 }
                 }else{
-                this.page.pageNum = 1;
-                this.finished = true;
+                    this.page.currentPage = 1;
+                    this.finished = true;
                 }
             },(res)=>{
                 this.$toast.fail(res.errorMsg);
-                this.page.pageNum =  this.page.pageNum - 1;
+                this.page.currentPage =  this.page.currentPage - 1;
                 this.loading = false;
                 this.finished = false;
                 this.loadError = true;

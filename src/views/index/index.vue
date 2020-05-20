@@ -97,33 +97,31 @@ export default {
           ],
           [
             { text: '全部提供商', value: 'all' },
-            { text: '联通', value: 'CUC' },
-            { text: '电信', value: 'CTC' }
+            { text: '联通', value: 2 },
+            { text: '电信', value: 3 }
           ],
           [
             { text: '筛选', value: 0 },
-            { text: '按保底消费降序', value: 1 },
-            { text: '按保底消费升序', value: 2 },
-            { text: '按预存金额降序', value: 3 },
-            { text: '按预存金额升序', value: 4 }
+            { text: '内含话费降序', value: 1 },
+            { text: '内含话费升序', value: 2 }
           ]
         ],
-        numberList: [{phoneNumber:'111',provinceName:'11',cityName:'aa',mno:'aa'}],
+        numberList: [],
         loading: false,
         loadError:false,
         finished: false,
         SwipeImage:['http://www.ms170.cn/fileupload?path=4e00e97b-9283-4e9b-9e34-4c63bchicenumber'],
         page: {
-          pageNum: 1,
+          currentPage: 1,
           pageSize: 20,
-          total: 0,
-          paging: "1",
+          totalResult: 0,
+          totalPage: "1",
         }
       }
   },
   created(){
     //查询号码等级
-    // this.queryNumberLevelRegex();
+    this.queryNumberLevelRegex();
     //清楚历史缓存
     sessionStorage.clear();
   },
@@ -132,7 +130,7 @@ export default {
       // 异步更新数据
       setTimeout(() => {
         this.queryNumberList(false);       
-        this.page.pageNum = this.page.pageNum + 1;
+        this.page.currentPage = this.page.currentPage + 1;
       }, 500);
     },
     orderOptionConfirm() {
@@ -140,18 +138,14 @@ export default {
       this.queryNumberList(true);
     },
     goChoicePackage(index){//套餐包选择
-      var numberObj = this.numberList[index];
-      sessionStorage.setItem(setAesString("numberObj"),setAesString(JSON.stringify(numberObj)));
-      this.$router.push({
-        path:"/packageChoice"
-      });
+     
     },
     goFiance(){
       window.location.href='http://www.ms170.cn/active/agentFianceChoice/TnpZME5BPT0mTURFek56TTM=';
     },
     dropdownChange(){
       //搜索条件该表
-      this.page.pageNum = 1;
+      this.page.currentPage = 1;
       this.queryNumberList(true);
     },
     goNumberList(type){
@@ -170,14 +164,14 @@ export default {
     queryNumberLevelRegex(){
         //查询号码等级
         var formdata={
-            service : "user.qryAcNumberLevelRegex",
+            
         }
-        this.$api.post("/mstx/pr/gateway.do", formdata,(res)=>{
+        this.$api.post("/dataDictionary/byPCode/RANK_LEVEL", formdata,(res)=>{
             if(res != null && res.length > 0){
                 for(var i = 0; i < res.length; i++){
                     this.searchOption[0].push({
-                        text:res[i],
-                        value:res[i]
+                        text:res[i].name,
+                        value:res[i].v1
                     });
                 }
             }
@@ -193,44 +187,42 @@ export default {
 
       var formdata={
         ...this.page,
+        param:{}
       }
 
       if(this.search.levelRegex != 'all'){
-        formdata.levelRegex = this.search.levelRegex;
+        formdata.param.rank = this.search.levelRegex;
       }
       if(this.search.providerCode != 'all'){
-        formdata.providerCode = this.search.providerCode;
+        formdata.param.mno = this.search.providerCode;
       }
 
       if(this.search.money == 1){
-        formdata.orderByBaseAmount = '0';//保底
+        formdata.param.bossPrestoreDesc = true;
       }else if(this.search.money == 2){
-        formdata.orderByBaseAmount = '1';
-      }else if(this.search.money == 3){
-        formdata.orderByPreDeposit = '1';//预付
-      }else if(this.search.money == 4){
-        formdata.orderByPreDeposit = '0';
+        formdata.param.bossPrestoreAsc = true;
       }
+
 
       this.$api.post("/phoneInfo/list", formdata,(res)=>{
         this.loadError = false;
         // 加载状态结束
         this.loading = false;
-        if(res != null && res.length>0){
-          for(var i = 0; i < res.length; i++){
-            this.numberList.push(res[i]);
+        if(res != null && res.content.length>0){
+          for(var i = 0; i < res.content.length; i++){
+            this.numberList.push(res.content[i]);
           }
-          if(res.length < this.page.pageSize){
+          if(res.content.length < this.page.pageSize){
             this.finished = true;
-            this.page.pageNum = 1;
+            this.page.currentPage = 1;
           }
         }else{
-          this.page.pageNum = 1;
+          this.page.currentPage = 1;
           this.finished = true;
         }
       },(res)=>{
         this.$toast.fail(res.errorMsg);
-        this.page.pageNum =  this.page.pageNum - 1;
+        this.page.currentPage =  this.page.currentPage - 1;
         this.loading = false;
         this.finished = false;
         this.loadError = true;
